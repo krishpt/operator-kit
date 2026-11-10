@@ -1,0 +1,4 @@
+operator-loop is adapted from nueramator/operator-framework
+(https://github.com/nueramator/operator-framework), MIT licensed.
+Copyright (c) 2026 The Operator Framework contributors.
+The upstream license text is in third_party/operator-framework-LICENSE.
