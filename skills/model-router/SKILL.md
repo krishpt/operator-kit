@@ -1,9 +1,9 @@
 ---
 name: model-router
-description: Pick the cheapest Claude model that does a task well (haiku, sonnet, opus, fable) and apply it to subagents, `claude -p` calls and evals. Use before spawning any Agent, running batch or eval work, or whenever usage on the owner's plan matters. the owner has no paid API key, so every call draws on the owner's plan limit.
+description: Pick the cheapest Claude model AND effort level that does a task well (haiku/sonnet/opus/fable; low/medium/high/xhigh/max), apply them to subagents, `claude -p` calls and evals, and tell the owner when the main chat should switch. Use before spawning any Agent, running batch or eval work, or whenever usage on the owner's plan matters. the owner has no paid API key, so every call draws on the owner's plan limit.
 ---
 
-# Model router
+# Model + effort router
 
 Usage on the owner's plan is the budget. Default to the cheapest tier that works; escalate only on evidence (a failed check, a wrong answer), never on vibes.
 
@@ -13,6 +13,19 @@ Usage on the owner's plan is the budget. Default to the cheapest tier that works
 | 2 | `sonnet` | Default workhorse: writing code, tests, edits, judges/graders with a rubric, research synthesis, doc drafting |
 | 3 | `opus` | Hard reasoning: architecture, tricky debugging, security review, plans touching many files |
 | 4 | `fable` | Highest-stakes or hardest: final review of a launch, decisions that are expensive to reverse, problems opus failed twice |
+
+## Effort (second dial; set it with the model)
+Effort is how hard the model thinks before answering. Higher = better on hard problems, slower, and burns the plan faster.
+| Effort | Use for |
+|---|---|
+| `low` | Mechanical: search, formatting, extraction, renames, log summaries (pairs with haiku) |
+| `medium` | **Default.** Most code, tests, reviews with a checklist, research synthesis, judgment calls (incl. Fable) |
+| `high` | Hard debugging, security review, plans touching many files, a fix that failed once at medium |
+| `xhigh` / `max` | Only when the owner asks, or a one-shot irreversible decision after `high` failed. Never by default. |
+Rules: cheapest model first, then the lowest effort that works; escalate ONE dial one step on a failed check (effort before model when the model is right but sloppy; model before effort when it lacks the skill). Pass `effort` on every Agent call this skill routes (the Agent tool only takes effort when an instruction like this one asks for it).
+
+## Switching the main chat
+Claude cannot change its own chat model or effort; only the owner can (`/model`, `/effort`). When the next stretch of work clearly fits a different tier, Claude says so in one line with the exact command, e.g. "Next is routine edits: `/model sonnet` and `/effort medium` would save usage." Do this at natural breaks, not every turn; if the owner says usage is running low, recommend `sonnet` + `medium` and delegate heavy work to subagents at lower tiers.
 
 ## The kitchen brigade (who does what)
 | Role | Model | Owns | Never does |
@@ -28,6 +41,7 @@ Importance test: reversible + cheap -> haiku/sonnet. Touches many files, securit
 ## How to apply
 - **Agent tool:** always pass `model` (Explore/search -> haiku; general work -> sonnet; Plan/review -> opus). Do not spawn agents when 2-3 direct tool calls do it.
 - **`claude -p` / evals:** generation runs on the plan default or `CLAUDECODE_MODEL`; the judge runs on your judge-model setting (default `sonnet`). Iterate with `--n 3`; only the final ship run uses `--n 10`.
+- **Fable budget:** Fable runs read-only judgment tasks at `effort: medium` with a strict scope and a short required output; never max effort or a build task unless the owner asks.
 - **Escalate once:** if a tier-N result fails its check, retry one tier up, then stop and report. Never loop.
 - **Down-shift:** after a plan is made on opus, hand execution to sonnet/haiku.
 - **Batch and cache:** one call over many items beats many calls; do not re-ask what is already in context.
